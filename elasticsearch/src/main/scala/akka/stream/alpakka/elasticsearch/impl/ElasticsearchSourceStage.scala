@@ -134,6 +134,7 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
           .withEntity(
             HttpEntity(ContentTypes.`application/json`, searchBody)
           )
+          .withHeaders(settings.connection.headers.getOrElse(List()))
 
         ElasticsearchApi
           .executeRequest(
