@@ -92,6 +92,7 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
     try {
       waitingForElasticData = true
 
+      log.info(s"sendScrollScanRequest")
       if (scrollId == null) {
         log.debug("Doing initial search")
 
@@ -128,13 +129,20 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
           case ApiVersion.V5 => s"/${elasticsearchParams.indexName}/${elasticsearchParams.typeName.get}/_search"
           case ApiVersion.V7 => s"/${elasticsearchParams.indexName}/_search"
         }
-        val uri = Uri(settings.connection.baseUrl).withPath(Path(endpoint)).withQuery(Uri.Query(queryParams))
+        val uri = Uri()
+          .withScheme("https")
+          .withHost(settings.connection.baseUrl)
+          .withPort(settings.connection.port.getOrElse(0))
+          .withPath(Path(endpoint))
+          .withQuery(Uri.Query(queryParams))
         val request = HttpRequest(HttpMethods.POST)
           .withUri(uri)
           .withEntity(
             HttpEntity(ContentTypes.`application/json`, searchBody)
           )
           .withHeaders(settings.connection.headers.getOrElse(List()))
+
+        log.info(s"ElasticsearchSourceStage Request: ${request.toString()}")
 
         ElasticsearchApi
           .executeRequest(
@@ -151,11 +159,16 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
                 failureHandler
                   .invoke(new RuntimeException(s"Request failed for POST $uri, got $status with body: $body"))
               }
+            case _ => failureHandler.invoke((new RuntimeException(s"Not sure what is broken")))
           }
       } else {
         log.debug("Fetching next scroll")
 
-        val uri = Uri(settings.connection.baseUrl).withPath(Path("/_search/scroll"))
+        val uri = Uri()
+          .withHost(settings.connection.baseUrl)
+          .withPort(settings.connection.port.getOrElse(0))
+          .withPath(Path("/_search/scroll"))
+
         val request = HttpRequest(HttpMethods.POST)
           .withUri(uri)
           .withEntity(
